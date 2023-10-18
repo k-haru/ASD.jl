@@ -1,6 +1,6 @@
 module ASD
 
-using FileIO, Unitful
+using FileIO, Unitful, RecipesBase
 
 function __init__()
     add_format(format"ASD", (), ".asd")
@@ -161,6 +161,24 @@ function load(filename::File{format"ASD"})
 end
 
 load(filename::String) = load(query(filename))
+
+@recipe function plot(asd::ASDFile, frame::Int = 1; normalize = true)
+    xrange = range(0,asd.header.xScanRange,asd.header.xPixel)u"nm"
+    yrange = range(0,asd.header.yScanRange,asd.header.yPixel)u"nm"
+    seriestype --> :heatmap
+    #aspect_ratio --> 
+    if normalize
+        min, max = extrema(asd.data.Topography[:,:,frame])
+        topo = (asd.data.Topography[:,:,frame] .- min)u"nm"
+    else
+        topo = asd.data.Topography[:,:,frame]u"nm"
+    end
+    (   
+        xrange,
+        yrange,
+        topo,
+    )
+end
 
 
 end # module ASD
