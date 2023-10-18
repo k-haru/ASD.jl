@@ -4,7 +4,7 @@ using FileIO
 
 function __init__()
     add_format(format"ASD", (), ".asd")
-end 
+end
 
 export ASDData, ASDHeader, load
 
@@ -58,31 +58,31 @@ struct ASDData
 end
 
 function load(filename::File{format"ASD"})
-    io = open(filename)
     field_names = fieldnames(ASDHeader)
     types = fieldtypes(ASDHeader)
     val = Any[]
-    for (name,type) in zip(field_names,types)
-        if type <: Number
-            eval(Meta.parse("$(name)::$(type) = read(io,$(type))"))
-            println("$(name)::$(type) = ",eval(name))
-        elseif type <: NTuple 
-            N = length(type.parameters)
-            T = type.parameters[1]
-            eval(Meta.parse("$(name)::$(type) = ntuple(i -> read(io,$T),$N)"))
-            println("$(name)::$(type) = ",eval(name))
-        elseif name == :operName
-            eval(Meta.parse("$(name)::$(type) = read(io,operationNameSize) |> String"))
-            println("$(name)::$(type) = ",eval(name))
-        elseif name == :comment
-            eval(Meta.parse("$(name)::$(type) = read(io,commentSize) |> String"))
-            println("$(name)::$(type) = ",eval(name))
-        else
-            error("Unkonwn error")
+    open(filename) do io
+        for (name, type) in zip(field_names, types)
+            if type <: Number
+                eval(Meta.parse("$(name)::$(type) = read(io,$(type))"))
+                println("$(name)::$(type) = ", eval(name))
+            elseif type <: NTuple
+                N = length(type.parameters)
+                T = type.parameters[1]
+                eval(Meta.parse("$(name)::$(type) = ntuple(i -> read(io,$T),$N)"))
+                println("$(name)::$(type) = ", eval(name))
+            elseif name == :operName
+                eval(Meta.parse("$(name)::$(type) = read(io,operationNameSize) |> String"))
+                println("$(name)::$(type) = ", eval(name))
+            elseif name == :comment
+                eval(Meta.parse("$(name)::$(type) = read(io,commentSize) |> String"))
+                println("$(name)::$(type) = ", eval(name))
+            else
+                error("Unkonwn error")
+            end
+            push!(val, eval(name))
         end
-        push!(val,eval(name))
     end
-    close(io)
     return ASDHeader(val...)
 end
 
