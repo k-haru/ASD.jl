@@ -1,7 +1,10 @@
 module ASD
 
 using FileIO
-add_format(format"ASD", (), ".asd")
+
+function __init__()
+    add_format(format"ASD", (), ".asd")
+end 
 
 export ASDData, ASDHeader, load
 
