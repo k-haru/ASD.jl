@@ -1,12 +1,19 @@
 module ASD
 
-using FileIO
+using FileIO, Unitful
 
 function __init__()
     add_format(format"ASD", (), ".asd")
 end
 
 export ASDData, ASDHeader, load
+
+const unipolar_1_0V = 0x00000001
+const unipolar_2_5V = 0x00000002
+const unipolar_5_0V = 0x00000004
+const bipolar_1_0V = 0x00010000
+const bipolar_2_5V = 0x00020000
+const bipolar_5_0V = 0x00040000
 
 struct ASDHeader
     fileVersion::Int32 #File version
@@ -38,9 +45,9 @@ struct ASDHeader
     frameAcqTime::Float32 #Frame acquisition time (ms)
     sensorSens::Float32 #Sensor sensitivity (nm/V)
     phaseSens::Float32 #Phase sensitivity (deg/V)
-    offset::NTuple{4,Int32} #Offset 12 bytes
+    offset::NTuple{4,Int32} #Offset 4 bytes
     machineNum::Int32 #Number of imaging machine
-    adRange::Int32 #Code showing AD range (AD_1V,AD2P5V, AD_5V of AD_80V)
+    adRange::Tuple{Float32,Float32} #Code showing AD range (AD_1V,AD2P5V, AD_5V of AD_80V)
     adRes::Int32 #AD resolution (When this value is 12, the AD resolution is 4096(2^12))
     xMaxScanRange::Float32 #X maximum scanning range (nm)
     yMaxScanRange::Float32 #Y maximum scanning range (nm)
@@ -53,37 +60,104 @@ struct ASDHeader
 end
 
 struct ASDData
-    header::ASDHeader
-    data
+    Topography::Array{Float32,3}
+    xOffset::Vector{Float32}
+    yOffset::Vector{Float32}
+    xTilt::Vector{Float32}
+    yTilt::Vector{Float32}
 end
 
-function load(filename::File{format"ASD"})
+struct ASDFile
+    header::ASDHeader
+    data::ASDData
+end
+
+function load_header(filename::File{format"ASD"})
     field_names = fieldnames(ASDHeader)
     types = fieldtypes(ASDHeader)
-    val = Any[]
+    vals = Any[]
     open(filename) do io
         for (name, type) in zip(field_names, types)
-            if type <: Number
-                eval(Meta.parse("$(name)::$(type) = read(io,$(type))"))
-                println("$(name)::$(type) = ", eval(name))
+            if name == :fileVersion
+                val = read(io, Int32)
+                if val != 1
+                    error("Unknown file version")
+                end
+            elseif name == :operName
+                val = read(io, operationNameSize) |> String
+            elseif name == :comment
+                val = read(io, commentSize) |> String
+            elseif name == :adRange
+                val = read(io, Int32)
+                if val == unipolar_1_0V
+                    val = (0, 1)
+                elseif val == unipolar_2_5V
+                    val = (0, 2.5)
+                elseif val == unipolar_5_0V
+                    val = (0, 5)
+                elseif val == bipolar_1_0V
+                    val = (-1, 1)
+                elseif val == bipolar_2_5V
+                    val = (-2.5, 2.5)
+                elseif val == bipolar_5_0V
+                    val = (-5, 5)
+                else
+                    error("Unknown AD range")
+                end
             elseif type <: NTuple
                 N = length(type.parameters)
                 T = type.parameters[1]
-                eval(Meta.parse("$(name)::$(type) = ntuple(i -> read(io,$T),$N)"))
-                println("$(name)::$(type) = ", eval(name))
-            elseif name == :operName
-                eval(Meta.parse("$(name)::$(type) = read(io,operationNameSize) |> String"))
-                println("$(name)::$(type) = ", eval(name))
-            elseif name == :comment
-                eval(Meta.parse("$(name)::$(type) = read(io,commentSize) |> String"))
-                println("$(name)::$(type) = ", eval(name))
+                val = ntuple(i -> read(io, T), N)
+            elseif type <: Number
+                val = read(io, type)
+                "$name::$type = $val" |> Meta.parse |> eval
             else
                 error("Unkonwn error")
             end
-            push!(val, eval(name))
+            println("$(name)::$(type) = ", val)
+            push!(vals, val)
         end
     end
-    return ASDHeader(val...)
+    ASDHeader(vals...)
+end
+
+function load_data(filename::File{format"ASD"}, header::ASDHeader)
+    frameNumber = Vector{Int32}(undef, header.numberFramesCurrent)
+    frameMaxData = Vector{UInt16}(undef, header.numberFramesCurrent)
+    frameMinData = Vector{UInt16}(undef, header.numberFramesCurrent)
+    xOffset = Vector{UInt16}(undef, header.numberFramesCurrent)
+    yOffset = Vector{UInt16}(undef, header.numberFramesCurrent)
+    xTilt = Vector{Float32}(undef, header.numberFramesCurrent)
+    yTilt = Vector{Float32}(undef, header.numberFramesCurrent)
+    flagLaserIr = Vector{Bool}(undef, header.numberFramesCurrent * 12)
+    rawData = Array{UInt16}(undef, header.xPixel, header.yPixel, header.numberFramesCurrent)
+    open(filename) do io
+        seek(io, header.fileHeaderSize)
+        frameSize = header.xPixel * header.yPixel
+        for i in 1:header.numberFramesCurrent
+            frameNumber[i] = read(io, Int32)
+            frameMaxData[i] = read(io, UInt16)
+            frameMinData[i] = read(io, UInt16)
+            xOffset[i] = read(io, UInt16)
+            yOffset[i] = read(io, UInt16)
+            xTilt[i] = read(io, Float32)
+            yTilt[i] = read(io, Float32)
+            flagLaserIr[(i-1)*12+1:i*12] .= ntuple(i -> read(io, Bool), 12)
+            rawData[(i-1)*frameSize+1:i*frameSize] .= ntuple(i -> read(io, UInt16), frameSize)
+        end
+    end
+    rawData = permutedims(Float32.(rawData), (2, 1, 3))
+    coef = header.zDriveGain * header.zExtCoef
+    minrange, maxrange = header.adRange
+    absvol = (maxrange - minrange)
+    Topography = -((rawData ./ 2^header.adRes .* absvol) .+ minrange) * coef
+    ASDData(Topography, xOffset, yOffset, xTilt, yTilt)
+end
+
+function load(filename::File{format"ASD"})
+    header = load_header(filename)
+    data = load_data(filename, header)
+    ASDFile(header, data)
 end
 
 load(filename::String) = load(query(filename))
