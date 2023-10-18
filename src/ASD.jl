@@ -1,10 +1,10 @@
 module ASD
+using FileIO
 
-export ASDData, ASDHeader, read
+export ASDData, ASDHeader, load
 
 
-
-@kwdef struct ASDHeader
+struct ASDHeader
     fileVersion::Int32 #File version
     fileHeaderSize::Int32 #Size of the file header
     frameHeaderSize::Int32 #Size of the frame header
@@ -34,7 +34,7 @@ export ASDData, ASDHeader, read
     frameAcqTime::Float32 #Frame acquisition time (ms)
     sensorSens::Float32 #Sensor sensitivity (nm/V)
     phaseSens::Float32 #Phase sensitivity (deg/V)
-    offset::NTuple{12,Int32} #Offset 12 bytes
+    offset::NTuple{4,Int32} #Offset 12 bytes
     machineNum::Int32 #Number of imaging machine
     adRange::Int32 #Code showing AD range (AD_1V,AD2P5V, AD_5V of AD_80V)
     adRes::Int32 #AD resolution (When this value is 12, the AD resolution is 4096(2^12))
@@ -53,18 +53,33 @@ struct ASDData
     data
 end
 
-function Base.read(filename::AbstractString,::ASDHeader)
-    names = fieldnames(ASDHeader)
+function load(filename::File{format"ASD"})
+    io = open(filename,"r")
+    field_names = fieldnames(ASDHeader)
     types = fieldtypes(ASDHeader)
-    for (name,type) in zip(names,types)
+    val = Any[]
+    for (name,type) in zip(field_names,types)
         if type <: Number
             eval(Meta.parse("$(name)::$(type) = read(io,$(type))"))
+            println("$(name)::$(type) = ",eval(name))
         elseif type <: NTuple 
             N = length(type.parameters)
             T = type.parameters[1]
-            eval(Meta.parse("$(name)::$(type) = read(io,$T,$N)"))
+            eval(Meta.parse("$(name)::$(type) = ntuple(i -> read(io,$T),$N)"))
+            println("$(name)::$(type) = ",eval(name))
+        elseif name == :operName
+            eval(Meta.parse("$(name)::$(type) = read(io,operationNameSize) |> String"))
+            println("$(name)::$(type) = ",eval(name))
+        elseif name == :comment
+            eval(Meta.parse("$(name)::$(type) = read(io,commentSize) |> String"))
+            println("$(name)::$(type) = ",eval(name))
+        else
+            error("Unkonwn error")
         end
+        push!(val,eval(name))
     end
+    close(io)
+    return ASDHeader(val...)
 end
 
 end # module ASD

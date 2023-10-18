@@ -2,3 +2,6 @@ name = "ASD"
 uuid = "41a99920-eaed-41ce-9caa-61f452df261d"
 authors = ["k-haru <haru@nips.ac.jp>"]
 version = "0.1.0"
+
+[deps]
+FileIO = "5789e2e9-d7fb-5bc7-8068-2c6fae9b9549"
