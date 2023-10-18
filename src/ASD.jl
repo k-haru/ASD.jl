@@ -58,7 +58,7 @@ struct ASDData
 end
 
 function load(filename::File{format"ASD"})
-    io = open(filename,"r")
+    io = open(filename)
     field_names = fieldnames(ASDHeader)
     types = fieldtypes(ASDHeader)
     val = Any[]
