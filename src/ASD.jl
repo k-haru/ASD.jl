@@ -1,8 +1,9 @@
 module ASD
+
 using FileIO
+add_format(format"ASD", (), ".asd")
 
 export ASDData, ASDHeader, load
-
 
 struct ASDHeader
     fileVersion::Int32 #File version
@@ -81,5 +82,8 @@ function load(filename::File{format"ASD"})
     close(io)
     return ASDHeader(val...)
 end
+
+load(filename::String) = load(query(filename))
+
 
 end # module ASD
