@@ -1,6 +1,6 @@
 module ASD
 
-using FileIO, Unitful, RecipesBase
+using FileIO, Unitful, RecipesBase, ColorSchemes
 
 function __init__()
     add_format(format"ASD", (), ".asd")
@@ -14,6 +14,8 @@ const unipolar_5_0V = 0x00000004
 const bipolar_1_0V = 0x00010000
 const bipolar_2_5V = 0x00020000
 const bipolar_5_0V = 0x00040000
+
+#include("../data/kanazawa_afm.jl")
 
 struct ASDHeader
     fileVersion::Int32 #File version
@@ -165,8 +167,11 @@ load(filename::String) = load(query(filename))
 @recipe function plot(asd::ASDFile, frame::Int = 1; normalize = true)
     xrange = range(0,asd.header.xScanRange,asd.header.xPixel)u"nm"
     yrange = range(0,asd.header.yScanRange,asd.header.yPixel)u"nm"
+    xpixsize = asd.header.xScanRange / asd.header.xPixel
+    ypixsize = asd.header.yScanRange / asd.header.yPixel
     seriestype --> :heatmap
-    #aspect_ratio --> 
+    c --> :afmhot
+    aspect_ratio -->  1
     if normalize
         min, max = extrema(asd.data.Topography[:,:,frame])
         topo = (asd.data.Topography[:,:,frame] .- min)u"nm"
