@@ -12,7 +12,7 @@ function __init__()
     end
 end
 
-export ASDData, ASDHeader, load
+export ASDFile, ASDData, ASDHeader, load
 
 const unipolar_1_0V = 0x00000001
 const unipolar_2_5V = 0x00000002
