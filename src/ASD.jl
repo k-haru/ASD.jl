@@ -2,8 +2,6 @@ module ASD
 
 using FileIO, Unitful, RecipesBase, ColorSchemes, Colors
 
-__precompile__(false)
-
 function __init__()
     add_format(format"ASD", (), ".asd")
 
@@ -13,7 +11,6 @@ function __init__()
     @eval const $key = colorschemes[$(QuoteNode(key))]
     end
 end
-__
 
 export ASDFile, ASDData, ASDHeader, load
 
