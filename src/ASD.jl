@@ -110,7 +110,12 @@ function load_header(filename::File{format"ASD"})
                     val = (-2.5, 2.5)
                 elseif val == bipolar_5_0V
                     val = (-5, 5)
+                elseif val == 3
+                    println("Unknown AD range:", val)
+                    println("Assume AD range is 0-10V")
+                    val = (0, 10)
                 else
+                    println("Unknown AD range:", val)
                     val = (-80, 80)
                 end
             elseif type <: NTuple
