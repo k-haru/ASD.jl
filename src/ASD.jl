@@ -54,7 +54,7 @@ struct ASDHeader
     frameAcqTime::Float32 #Frame acquisition time (ms)
     sensorSens::Float32 #Sensor sensitivity (nm/V)
     phaseSens::Float32 #Phase sensitivity (deg/V)
-    offset::NTuple{4,Int32} #Offset 4 bytes
+    offset::NTuple{4,Int32} #Offset 16 bytes
     machineNum::Int32 #Number of imaging machine
     adRange::Tuple{Float32,Float32} #Code showing AD range (AD_1V,AD2P5V, AD_5V of AD_80V)
     adRes::Int32 #AD resolution (When this value is 12, the AD resolution is 4096(2^12))
