@@ -4,15 +4,13 @@ using FileIO, Unitful, RecipesBase, ColorSchemes, Colors
 
 function __init__()
     add_format(format"ASD", (), ".asd")
-
-    datadir = joinpath(dirname(@__DIR__), "data")
-    include(joinpath(datadir, "kanazawa_afm.jl"))
-    for key in keys(colorschemes)
-    @eval const $key = colorschemes[$(QuoteNode(key))]
-    end
 end
 
 export ASDFile, ASDData, ASDHeader, load
+
+
+datadir = joinpath(dirname(@__DIR__), "data")
+const cs = include(joinpath(datadir, "kanazawa_afm.jl"))
 
 const unipolar_1_0V = 0x00000001
 const unipolar_2_5V = 0x00000002
@@ -182,7 +180,7 @@ load(filename::String) = load(query(filename))
     xpixsize = asd.header.xScanRange / asd.header.xPixel
     ypixsize = asd.header.yScanRange / asd.header.yPixel
     seriestype --> :heatmap
-    c --> :kanazawa_afm
+    c --> cs.colors
     aspect_ratio -->  1
     xlims --> (0, asd.header.xScanRange)
     ylims --> (0, asd.header.yScanRange)
